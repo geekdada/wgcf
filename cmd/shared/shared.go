@@ -1,9 +1,12 @@
 package shared
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/ViRb3/wgcf/v2/cloudflare"
@@ -62,6 +65,8 @@ func PrintDeviceData(thisDevice *cloudflare.Device, boundDevice *cloudflare.Boun
 	log.Printf("%-13s : %t\n", "Device active", boundDevice.Active)
 	log.Printf("%-13s : %s\n", "Account type", thisDevice.Account.AccountType)
 	log.Printf("%-13s : %s\n", "Role", thisDevice.Account.Role)
+	log.Printf("%-13s : %s\n", "Client ID", thisDevice.Config.ClientId)
+	log.Printf("%-13s : %s\n", "Reserved Bits", ParseReserveBits(thisDevice.Config.ClientId))
 	log.Printf("%-13s : %s\n", "Premium data", F32ToHumanReadable(thisDevice.Account.PremiumData))
 	log.Printf("%-13s : %s\n", "Quota", F32ToHumanReadable(thisDevice.Account.Quota))
 	log.Println("=======================================")
@@ -80,4 +85,27 @@ func SetDeviceName(ctx *config.Context, deviceName string) (*cloudflare.BoundDev
 		return nil, errors.New("could not update device name")
 	}
 	return device, nil
+}
+
+func ParseReserveBits(clientID string) string {
+	decoded, _ := base64.StdEncoding.DecodeString(clientID)
+
+	hexString := hex.EncodeToString(decoded)
+
+	// 将十六进制字符串转换为十进制值并打印它们
+	var decValues []string
+	for i := 0; i < len(hexString); i += 2 {
+		hexByte := hexString[i : i+2]
+		decValue, _ := strconv.ParseInt(hexByte, 16, 64)
+		decValues = append(decValues, fmt.Sprintf("%d%d%d", decValue/100, (decValue/10)%10, decValue%10))
+	}
+
+	reserved := []int{}
+	for i := 0; i < len(hexString); i += 2 {
+		hexByte := hexString[i : i+2]
+		decValue, _ := strconv.ParseInt(hexByte, 16, 64)
+		reserved = append(reserved, int(decValue))
+	}
+
+	return fmt.Sprintln("[", strings.Trim(strings.Join(strings.Fields(fmt.Sprint(reserved)), ", "), "[]"), "]")
 }
